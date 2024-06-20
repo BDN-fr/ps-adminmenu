@@ -746,5 +746,5 @@ ESX_Vehicles = {
 }
 
 for _, v in pairs(ESX_Vehicles) do
-    ESX_VehicleHashes[v.hash] = v
+    ESX_VehicleHashes[v.model] = v
 end
