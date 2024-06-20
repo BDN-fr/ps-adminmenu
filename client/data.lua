@@ -1,3 +1,5 @@
+local PedList = require "data.ped"
+
 -- Returns a list of vehicles from QBCore.Shared.Vehicles
 local function GetVehicles()
     local vehicles = {}
@@ -112,6 +114,7 @@ function GetData()
             jobs = GetJobs(),
             gangs = GetGangs(),
             locations = GetLocations(),
+            pedlist = PedList
         },
     })
 end
