@@ -2,7 +2,7 @@
 RegisterNetEvent('ps-adminmenu:server:BanPlayer', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
-
+    if Config.Framework == "ESX" then return end -- ESX doesn't have a ban function (?)
     local player = selectedData["Player"].value
     local reason = selectedData["Reason"].value or ""
     local time = selectedData["Duration"].value
@@ -10,9 +10,7 @@ RegisterNetEvent('ps-adminmenu:server:BanPlayer', function(data, selectedData)
     local banTime = tonumber(os.time() + time)
     local timeTable = os.date('*t', banTime)
 
-    MySQL.insert('INSERT INTO bans (name, license, discord, ip, reason, expire, bannedby) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        { GetPlayerName(player), QBCore.Functions.GetIdentifier(player, 'license'), QBCore.Functions.GetIdentifier(
-            player, 'discord'), QBCore.Functions.GetIdentifier(player, 'ip'), reason, banTime, GetPlayerName(source) })
+    MySQL.insert('INSERT INTO bans (name, license, discord, ip, reason, expire, bannedby) VALUES (?, ?, ?, ?, ?, ?, ?)', { GetPlayerName(player), QBCore.Functions.GetIdentifier(player, 'license'), QBCore.Functions.GetIdentifier(player, 'discord'), QBCore.Functions.GetIdentifier(player, 'ip'), reason, banTime, GetPlayerName(source)})
 
     if time == 2147483647 then
         DropPlayer(player, locale("banned") .. '\n' .. locale("reason") .. reason .. locale("ban_perm"))
@@ -28,48 +26,46 @@ RegisterNetEvent('ps-adminmenu:server:BanPlayer', function(data, selectedData)
             '/' .. timeTable['month'] .. '/' .. timeTable['year'] .. ' ' .. timeTable['hour'] .. ':' .. timeTable['min'])
     end
 
-    QBCore.Functions.Notify(source, locale("playerbanned", player, banTime, reason), 'success', 7500)
+    showNotification(source, locale("playerbanned", player, banTime, reason), 'success', 7500)
 end)
 
 -- Warn Player
 RegisterNetEvent('ps-adminmenu:server:WarnPlayer', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
+    if Config.Framework == "ESX" then return end -- player_warns doesn't exist in ESX
     local targetId = selectedData["Player"].value
     local target = QBCore.Functions.GetPlayer(targetId)
     local reason = selectedData["Reason"].value
     local sender = QBCore.Functions.GetPlayer(source)
     local warnId = 'WARN-' .. math.random(1111, 9999)
     if target ~= nil then
-        QBCore.Functions.Notify(target.PlayerData.source,
-            locale("warned") .. ", for: " .. locale("reason") .. ": " .. reason, 'inform', 10000)
-        QBCore.Functions.Notify(source,
-            locale("warngiven") .. GetPlayerName(target.PlayerData.source) .. ", for: " .. reason)
-        MySQL.insert('INSERT INTO player_warns (senderIdentifier, targetIdentifier, reason, warnId) VALUES (?, ?, ?, ?)',
-            {
-                sender.PlayerData.license,
-                target.PlayerData.license,
-                reason,
-                warnId
-            })
+        showNotification(target.PlayerData.source, locale("warned") .. ", for: " .. locale("reason") .. ": " .. reason, 'inform', 10000)
+        showNotification(source, locale("warngiven") .. GetPlayerName(target.PlayerData.source) .. ", for: " .. reason)
+        MySQL.insert('INSERT INTO player_warns (senderIdentifier, targetIdentifier, reason, warnId) VALUES (?, ?, ?, ?)', {
+            sender.PlayerData.license,
+            target.PlayerData.license,
+            reason,
+            warnId
+        })
     else
-        TriggerClientEvent('QBCore:Notify', source, locale("not_online"), 'error')
+        showNotification(source, locale("not_online"), 'error')
     end
 end)
 
 RegisterNetEvent('ps-adminmenu:server:KickPlayer', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
-    local src = source
-    local target = QBCore.Functions.GetPlayer(selectedData["Player"].value)
+    local src = srouce
+    local target = getPlayerFromId(selectedData["Player"].value)
     local reason = selectedData["Reason"].value
-
+        
     if not target then
-        QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500)
+        showNotification(src, locale("not_online"), 'error', 7500)
         return
     end
-
-    DropPlayer(target.PlayerData.source, locale("kicked") .. '\n' .. locale("reason") .. reason)
+        
+    DropPlayer(tonumber(selectedData["Player"].value), locale("kicked") .. '\n' .. locale("reason") .. reason)
 end)
 
 -- Revive Player
@@ -97,15 +93,26 @@ RegisterNetEvent('ps-adminmenu:server:ReviveRadius', function(data)
     local src = source
     local ped = GetPlayerPed(src)
     local pos = GetEntityCoords(ped)
-    local players = QBCore.Functions.GetPlayers()
+    local players = getAllPlayers()
 
     for k, v in pairs(players) do
-        local target = GetPlayerPed(v)
+        local target = false
+        if Config.Framework == "QBCore" then
+            target = GetPlayerPed(v.PlayerData.source)
+        end
+        if Config.Framework == "ESX" then
+            target = GetPlayerPed(v.source)
+        end
         local targetPos = GetEntityCoords(target)
         local dist = #(pos - targetPos)
 
         if dist < 15.0 then
-            TriggerClientEvent("hospital:client:Revive", v)
+            if Config.Framework == "QBCore" then
+                TriggerClientEvent("hospital:client:Revive", v.PlayerData.source)
+            end
+            if Config.Framework == "ESX" then
+                TriggerEvent('esx_ambulancejob:revive', v.source)
+            end
         end
     end
 end)
@@ -121,11 +128,11 @@ RegisterNetEvent('ps-adminmenu:server:SetBucket', function(data, selectedData)
     local currentBucket = GetPlayerRoutingBucket(player)
 
     if bucket == currentBucket then
-        return QBCore.Functions.Notify(src, locale("target_same_bucket", player), 'error', 7500)
+        return showNotification(src, locale("target_same_bucket",  player), 'error', 7500)
     end
 
     SetPlayerRoutingBucket(player, bucket)
-    QBCore.Functions.Notify(src, locale("bucket_set_for_target", player, bucket), 'success', 7500)
+    showNotification(src, locale("bucket_set_for_target", player, bucket), 'success', 7500)
 end)
 
 -- Get RoutingBucket
@@ -137,88 +144,98 @@ RegisterNetEvent('ps-adminmenu:server:GetBucket', function(data, selectedData)
     local player = selectedData["Player"].value
     local currentBucket = GetPlayerRoutingBucket(player)
 
-    QBCore.Functions.Notify(src, locale("bucket_get", player, currentBucket), 'success', 7500)
+    showNotification(src, locale("bucket_get", player, currentBucket), 'success', 7500)
 end)
 
 -- Give Money
 RegisterNetEvent('ps-adminmenu:server:GiveMoney', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
-
-    local src = source
-    local target, amount, moneyType = selectedData["Player"].value, selectedData["Amount"].value,
-        selectedData["Type"].value
-    local Player = QBCore.Functions.GetPlayer(tonumber(target))
-
-    if Player == nil then
-        return QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500)
+    if not selectedData["Player"] or not selectedData["Amount"] or not selectedData["Type"] then
+        return
     end
-
-    Player.Functions.AddMoney(tostring(moneyType), tonumber(amount))
-    QBCore.Functions.Notify(src,
-        locale((moneyType == "crypto" and "give_money_crypto" or "give_money"), tonumber(amount),
-            Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname), "success")
+    local src = source
+    local target, amount, moneyType = selectedData["Player"].value, selectedData["Amount"].value, selectedData["Type"].value
+    if not tonumber(amount) or not moneyType then return end
+    local res = addMoney(tonumber(target), moneyType, amount)
+    if res then
+        local fullName = getName(tonumber(target))
+        showNotification(src, locale((moneyType == "crypto" and "give_money_crypto" or "give_money"), tonumber(amount), fullName), "success")
+    else
+        showNotification(src, locale("not_online"), 'error', 7500)
+    end
 end)
 
 -- Give Money to all
 RegisterNetEvent('ps-adminmenu:server:GiveMoneyAll', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
-
+    if not selectedData["Amount"] or not selectedData["Type"] then
+        return
+    end
     local src = source
     local amount, moneyType = selectedData["Amount"].value, selectedData["Type"].value
-    local players = QBCore.Functions.GetPlayers()
-
-    for _, v in pairs(players) do
-        local Player = QBCore.Functions.GetPlayer(tonumber(v))
-        Player.Functions.AddMoney(tostring(moneyType), tonumber(amount))
-        QBCore.Functions.Notify(src,
-            locale((moneyType == "crypto" and "give_money_all_crypto" or "give_money_all"), tonumber(amount)), "success")
+    if not amount or not moneyType then return end
+    local players = getAllPlayers()
+    for _, Player in pairs(players) do
+        if Config.Framework == "QBCore" then
+            addMoney(Player.PlayerData.source, tostring(moneyType), tonumber(amount))
+        end
+        if Config.Framework == "ESX" then
+            addMoney(Player.source, tostring(moneyType), tonumber(amount))
+        end
     end
+    showNotification(src, locale((moneyType == "crypto" and "give_money_all_crypto" or "give_money_all"), tonumber(amount), ""), "success")
 end)
 
 -- Take Money
 RegisterNetEvent('ps-adminmenu:server:TakeMoney', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
-
+    if not selectedData["Player"] or not selectedData["Amount"] or not selectedData["Type"] then
+        return
+    end
     local src = source
-    local target, amount, moneyType = selectedData["Player"].value, selectedData["Amount"].value,
-        selectedData["Type"].value
-    local Player = QBCore.Functions.GetPlayer(tonumber(target))
-
+    local target, amount, moneyType = selectedData["Player"].value, selectedData["Amount"].value, selectedData["Type"].value
+    local Player = getPlayerFromId(tonumber(target))
+    
     if Player == nil then
-        return QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500)
+        return showNotification(src, locale("not_online"), 'error', 7500)
     end
-
-    if Player.PlayerData.money[moneyType] >= tonumber(amount) then
-        Player.Functions.RemoveMoney(moneyType, tonumber(amount), "state-fees")
+    if not tonumber(amount) or not moneyType then return end
+    if getMoney(tonumber(target), moneyType) >= tonumber(amount) then
+        removeMoney(tonumber(target), moneyType, amount, "state-fees")
     else
-        QBCore.Functions.Notify(src, locale("not_enough_money"), "primary")
+        showNotification(src, locale("not_enough_money"), "primary")
     end
-
-    QBCore.Functions.Notify(src,
-        locale((moneyType == "crypto" and "take_money_crypto" or "take_money"), tonumber(amount) .. "$",
-            Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname), "success")
+    local fullName = getName(tonumber(target))
+    showNotification(src, locale((moneyType == "crypto" and "take_money_crypto" or "take_money"), tonumber(amount) .. "$", fullName), "success")
 end)
 
 -- Blackout
 local Blackout = false
 RegisterNetEvent('ps-adminmenu:server:ToggleBlackout', function(data)
-    local data = CheckDataFromKey(data)
-    if not data or not CheckPerms(source, data.perms) then return end
+    if not CheckPerms(data.perms) then return end
     Blackout = not Blackout
 
     local src = source
 
-    if Blackout then
-        TriggerClientEvent('QBCore:Notify', src, locale("blackout", "enabled"), 'primary')
+    if Blackout and Config.Weather == "qb-weather" then
+        showNotification(src, locale("blackout", "enabled"), 'primary')
         while Blackout do
             Wait(0)
             exports["qb-weathersync"]:setBlackout(true)
         end
         exports["qb-weathersync"]:setBlackout(false)
-        TriggerClientEvent('QBCore:Notify', src, locale("blackout", "disabled"), 'primary')
+        showNotification(src, locale("blackout", "disabled"), 'primary')
+    end
+    if Config.Weather == "av_weather" then
+        exports['av_weather']:SetBlackout(Blackout)
+        if Blackout then
+            showNotification(src, locale("blackout", "enabled"), 'primary')
+        else
+            showNotification(src, locale("blackout", "disabled"), 'primary')
+        end
     end
 end)
 
@@ -230,7 +247,7 @@ RegisterNetEvent('ps-adminmenu:server:CuffPlayer', function(data, selectedData)
     local target = selectedData["Player"].value
 
     TriggerClientEvent('ps-adminmenu:client:ToggleCuffs', target)
-    QBCore.Functions.Notify(source, locale("toggled_cuffs"), 'success')
+    showNotification(source, locale("toggled_cuffs"), 'success')
 end)
 
 -- Give Clothing Menu
@@ -242,7 +259,7 @@ RegisterNetEvent('ps-adminmenu:server:ClothingMenu', function(data, selectedData
     local target = tonumber(selectedData["Player"].value)
 
     if target == nil then
-        return QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500)
+        return showNotification(src, locale("not_online"), 'error', 7500)
     end
 
     if target == src then
@@ -257,7 +274,7 @@ RegisterNetEvent("ps-adminmenu:server:setPed", function(data, selectedData)
     local src = source
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then
-        QBCore.Functions.Notify(src, locale("no_perms"), "error", 5000)
+        showNotification(src, locale("no_perms"), "error", 5000)
         return
     end
 
@@ -266,7 +283,7 @@ RegisterNetEvent("ps-adminmenu:server:setPed", function(data, selectedData)
     local Player = QBCore.Functions.GetPlayer(tsrc)
 
     if not Player then
-        QBCore.Functions.Notify(locale("not_online"), "error", 5000)
+        showNotification(locale("not_online"), "error", 5000)
         return
     end
 

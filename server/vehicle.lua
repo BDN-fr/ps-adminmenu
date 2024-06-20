@@ -1,13 +1,11 @@
 -- Admin Car
 RegisterNetEvent('ps-adminmenu:server:SaveCar', function(mods, vehicle, _, plate)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
-    local result = MySQL.query.await('SELECT plate FROM player_vehicles WHERE plate = ?', { plate })
-
-    if result[1] == nil then
-        MySQL.insert(
-        'INSERT INTO player_vehicles (license, citizenid, vehicle, hash, mods, plate, state) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            {
+    local Player = getPlayerFromId(src)
+    if Config.Framework == "QBCore" then
+        local result = MySQL.query.await('SELECT plate FROM player_vehicles WHERE plate = ?', {plate})
+        if result[1] == nil then
+            MySQL.insert('INSERT INTO player_vehicles (license, citizenid, vehicle, hash, mods, plate, state) VALUES (?, ?, ?, ?, ?, ?, ?)', {
                 Player.PlayerData.license,
                 Player.PlayerData.citizenid,
                 vehicle.model,
@@ -16,14 +14,33 @@ RegisterNetEvent('ps-adminmenu:server:SaveCar', function(mods, vehicle, _, plate
                 plate,
                 0
             })
-        TriggerClientEvent('QBCore:Notify', src, locale("veh_owner"), 'success', 5000)
-    else
-        TriggerClientEvent('QBCore:Notify', src, locale("u_veh_owner"), 'error', 3000)
+            showNotification(src, locale("veh_owner"), 'success', 5000)
+        else
+            showNotification(src, locale("u_veh_owner"), 'error', 3000)
+        end
+    end
+    if Config.Framework == "ESX" then
+        local result = MySQL.query.await('SELECT plate FROM owned_vehicles WHERE plate = ?', {plate})
+        if result[1] == nil then
+            MySQL.insert('INSERT INTO owned_vehicles (owner, plate, vehicle, stored) VALUES (?, ?, ?, ?)', {
+                Player.getIdentifier(),
+                plate,
+                json.encode(mods),
+                0
+            })
+            showNotification(src, locale("veh_owner"), 'success', 5000)
+        else
+            showNotification(src, locale("u_veh_owner"), 'error', 3000)
+        end
     end
 end)
 
+-------- Give Car maybe later
+
 -- Give Car
 RegisterNetEvent("ps-adminmenu:server:givecar", function(data, selectedData)
+    if Config.Framework == 'ESX' then return end
+
     local src = source
 
     local data = CheckDataFromKey(data)
@@ -89,6 +106,8 @@ end)
 
 -- Give Car
 RegisterNetEvent("ps-adminmenu:server:SetVehicleState", function(data, selectedData)
+    if Config.Framework == 'ESX' then return end
+
     local src = source
 
     local data = CheckDataFromKey(data)
@@ -115,6 +134,8 @@ RegisterNetEvent("ps-adminmenu:server:SetVehicleState", function(data, selectedD
     QBCore.Functions.Notify(src, locale("state_changed"), "success", 5000)
 end)
 
+-------------------------------------------------
+
 -- Change Plate
 RegisterNetEvent('ps-adminmenu:server:ChangePlate', function(newPlate, currentPlate)
     local newPlate = newPlate:upper()
@@ -122,17 +143,59 @@ RegisterNetEvent('ps-adminmenu:server:ChangePlate', function(newPlate, currentPl
     if Config.Inventory == 'ox_inventory' then
         exports.ox_inventory:UpdateVehicle(currentPlate, newPlate)
     end
-
-    MySQL.Sync.execute('UPDATE player_vehicles SET plate = ? WHERE plate = ?', { newPlate, currentPlate })
-    MySQL.Sync.execute('UPDATE trunkitems SET plate = ? WHERE plate = ?', { newPlate, currentPlate })
-    MySQL.Sync.execute('UPDATE gloveboxitems SET plate = ? WHERE plate = ?', { newPlate, currentPlate })
+    if Config.Framework == "QBCore" then
+        MySQL.Sync.execute('UPDATE player_vehicles SET plate = ? WHERE plate = ?', {newPlate, currentPlate})
+        MySQL.Sync.execute('UPDATE trunkitems SET plate = ? WHERE plate = ?', {newPlate, currentPlate})
+        MySQL.Sync.execute('UPDATE gloveboxitems SET plate = ? WHERE plate = ?', {newPlate, currentPlate})
+    end
+    if Config.Framework == "ESX" then
+        MySQL.Sync.execute('UPDATE owned_vehicles SET plate = ? WHERE plate = ?', {newPlate, currentPlate})
+    end
 end)
 
-lib.callback.register('ps-adminmenu:server:GetVehicleByPlate', function(source, plate)
-    local result = MySQL.query.await('SELECT vehicle FROM player_vehicles WHERE plate = ?', { plate })
-    local veh = result[1] and result[1].vehicle or {}
-    return veh
+lib.callback.register('ps-adminmenu:getVehicleData', function(source, plate)
+    local vehData = {}
+    if Config.Framework == "QBCore" then
+        local res = MySQL.query.await('SELECT (mods, vehicle) FROM player_vehicles WHERE plate = ?', {plate})
+        vehData = res[1] or {}
+        if vehData and vehData['mods'] then
+            vehData['mods'] = json.decode(vehData['mods'])
+        end
+    end
+    if Config.Framework == "ESX" then
+        local res = MySQL.query.await('SELECT vehicle FROM owned_vehicles WHERE plate = ?', {plate})
+        vehData = res[1] or {}
+        if vehData and vehData['vehicle'] then
+            vehData['mods'] = json.decode(vehData['vehicle'])
+            vehData['vehicle'] = vehData['mods'].model
+        end
+    end
+    return vehData
 end)
+
+lib.callback.register('ps-adminmenu:spawnVehicle', function(source, model, coords, warp)
+    local ped = GetPlayerPed(source)
+    model = type(model) == 'string' and joaat(model) or model
+    if not coords then coords = GetEntityCoords(ped) end
+    local veh = CreateVehicle(model, coords.x, coords.y, coords.z, coords.w, true, true)
+    while not DoesEntityExist(veh) do Wait(0) end
+    if warp then
+        while GetVehiclePedIsIn(ped) ~= veh do
+            Wait(0)
+            TaskWarpPedIntoVehicle(ped, veh, -1)
+        end
+    end
+    while NetworkGetEntityOwner(veh) ~= source do Wait(0) end
+    local netId = NetworkGetNetworkIdFromEntity(veh)
+    return netId
+end)
+
+-- lib.callback.register('ps-adminmenu:server:GetVehicleByPlate', function(source, plate)
+--     local result = {}
+--     MySQL.query.await('SELECT vehicle FROM player_vehicles WHERE plate = ?', {plate})
+--     local veh = result[1] and result[1].vehicle or {}
+--     return veh
+-- end)
 
 -- Fix Vehicle for player
 RegisterNetEvent('ps-adminmenu:server:FixVehFor', function(data, selectedData)
@@ -145,8 +208,8 @@ RegisterNetEvent('ps-adminmenu:server:FixVehFor', function(data, selectedData)
         local name = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
         TriggerClientEvent('iens:repaira', Player.PlayerData.source)
         TriggerClientEvent('vehiclemod:client:fixEverything', Player.PlayerData.source)
-        QBCore.Functions.Notify(src, locale("veh_fixed", name), 'success', 7500)
+        showNotification(src, locale("veh_fixed", name), 'success', 7500)
     else
-        TriggerClientEvent('QBCore:Notify', src, locale("not_online"), "error")
+        showNotification(src, locale("not_online"), "error")
     end
 end)

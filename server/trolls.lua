@@ -13,19 +13,14 @@ RegisterNetEvent('ps-adminmenu:server:FreezePlayer', function(data, selectedData
     if not frozen then
         frozen = true
         FreezeEntityPosition(ped, true)
-        QBCore.Functions.Notify(src,
-            locale("Frozen",
-                Player.PlayerData.charinfo.firstname ..
-                " " .. Player.PlayerData.charinfo.lastname .. " | " .. Player.PlayerData.citizenid), 'Success', 7500)
+        showNotification(src, locale("Frozen", fullName .. " | " .. identifier), 'Success', 7500)
     else
         frozen = false
         FreezeEntityPosition(ped, false)
-        QBCore.Functions.Notify(src,
-            locale("deFrozen",
-                Player.PlayerData.charinfo.firstname ..
-                " " .. Player.PlayerData.charinfo.lastname .. " | " .. Player.PlayerData.citizenid), 'Success', 7500)
+        showNotification(src, locale("deFrozen", fullName .. " | " .. identifier), 'Success', 7500)
+
     end
-    if Player == nil then return QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500) end
+    if Player == nil then return showNotification(src, locale("not_online"), 'error', 7500) end
 end)
 
 -- Drunk Player
@@ -35,15 +30,14 @@ RegisterNetEvent('ps-adminmenu:server:DrunkPlayer', function(data, selectedData)
 
     local src = source
     local target = selectedData["Player"].value
-    local targetPed = GetPlayerPed(target)
-    local Player = QBCore.Functions.GetPlayer(target)
+    local Player = getPlayerFromId(target)
 
     if not Player then
-        return QBCore.Functions.Notify(src, locale("not_online"), 'error', 7500)
+        return showNotification(src, locale("not_online"), 'error', 7500)
     end
 
     TriggerClientEvent('ps-adminmenu:client:InitiateDrunkEffect', target)
-    QBCore.Functions.Notify(src,
+    showNotification(src,
         locale("playerdrunk",
             Player.PlayerData.charinfo.firstname ..
             " " .. Player.PlayerData.charinfo.lastname .. " | " .. Player.PlayerData.citizenid), 'Success', 7500)
