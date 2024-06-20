@@ -13,6 +13,40 @@ function CheckPerms(src, perms)
     return hasPerms
 end
 
+function CheckDataFromKey(key)
+    local actions = Config.Actions[key]
+    if actions then
+        local data = nil
+
+        if actions.event then
+            data = actions
+        end
+
+        if actions.dropdown then
+            for _, v in pairs(actions.dropdown) do
+                if v.event then
+                    local new = v
+                    new.perms = actions.perms
+                    data = new
+                    break
+                end
+            end
+        end
+
+        return data
+    end
+
+    local playerActions = Config.PlayerActions[key]
+    if playerActions then
+        return playerActions
+    end
+
+    local otherActions = Config.OtherActions[key]
+    if otherActions then
+        return otherActions
+    end
+end
+
 ---@param plate string
 ---@return boolean
 function CheckAlreadyPlate ( plate )
