@@ -35,17 +35,13 @@ RegisterNetEvent('ps-adminmenu:server:SaveCar', function(mods, vehicle, _, plate
     end
 end)
 
--------- Give Car maybe later
-
 -- Give Car
 RegisterNetEvent("ps-adminmenu:server:givecar", function(data, selectedData)
-    if Config.Framework == 'ESX' then return end
-
     local src = source
 
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then
-        QBCore.Functions.Notify(src, locale("no_perms"), "error", 5000)
+        showNotification(src, locale("no_perms"), "error", 5000)
         return
     end
 
@@ -59,7 +55,7 @@ RegisterNetEvent("ps-adminmenu:server:givecar", function(data, selectedData)
     local tsrc = selectedData['Player'].value
     local plate = selectedData['Plate (Optional)'] and selectedData['Plate (Optional)'].value or vehicleData.plate
     local garage = selectedData['Garage (Optional)'] and selectedData['Garage (Optional)'].value or Config.DefaultGarage
-    local Player = QBCore.Functions.GetPlayer(tsrc)
+    local Player = getPlayerFromId(tsrc)
 
     if plate and #plate < 1 then
         plate = vehicleData.plate
@@ -70,38 +66,51 @@ RegisterNetEvent("ps-adminmenu:server:givecar", function(data, selectedData)
     end
 
     if plate:len() > 8 then
-        QBCore.Functions.Notify(src, locale("plate_max"), "error", 5000)
+        showNotification(src, locale("plate_max"), "error", 5000)
         return
     end
 
     if not Player then
-        QBCore.Functions.Notify(src, locale("not_online"), "error", 5000)
+        showNotification(src, locale("not_online"), "error", 5000)
         return
     end
 
     if CheckAlreadyPlate(plate) then
-        QBCore.Functions.Notify(src, locale("givecar.error.plates_alreadyused", plate:upper()), "error", 5000)
+        showNotification(src, locale("givecar.error.plates_alreadyused", plate:upper()), "error", 5000)
         return
     end
 
-    MySQL.insert(
-    'INSERT INTO player_vehicles (license, citizenid, vehicle, hash, mods, plate, garage, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        {
-            Player.PlayerData.license,
-            Player.PlayerData.citizenid,
-            vehmodel,
-            joaat(vehmodel),
-            json.encode(vehicleData),
-            plate,
-            garage,
-            1
-        })
+    if Config.Framework == 'QBCore' then
+        MySQL.insert(
+            'INSERT INTO player_vehicles (license, citizenid, vehicle, hash, mods, plate, garage, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                {
+                    Player.PlayerData.license,
+                    Player.PlayerData.citizenid,
+                    vehmodel,
+                    joaat(vehmodel),
+                    json.encode(vehicleData),
+                    plate,
+                    garage,
+                    1
+                })
+        showNotification(src,
+            locale("givecar.success.source", QBCore.Shared.Vehicles[vehmodel].name,
+                ("%s %s"):format(Player.PlayerData.charinfo.firstname, Player.PlayerData.charinfo.lastname)), "success", 5000)
+        showNotification(Player.PlayerData.source, locale("givecar.success.target", plate:upper(), garage), "success",
+            5000)
+    end
 
-    QBCore.Functions.Notify(src,
-        locale("givecar.success.source", QBCore.Shared.Vehicles[vehmodel].name,
-            ("%s %s"):format(Player.PlayerData.charinfo.firstname, Player.PlayerData.charinfo.lastname)), "success", 5000)
-    QBCore.Functions.Notify(Player.PlayerData.source, locale("givecar.success.target", plate:upper(), garage), "success",
-        5000)
+    if Config.Framework == "ESX" then
+        MySQL.insert('INSERT INTO owned_vehicles (owner, plate, vehicle, stored) VALUES (?, ?, ?, ?)', {
+            Player.getIdentifier(),
+            plate,
+            json.encode(vehicleData),
+            0
+            })
+        showNotification(src,
+            locale("givecar.success.source", ESX_VehicleHashes[vehmodel].name,
+                ("%s %s"):format(Player.firstname, Player.lastname)), "success", 5000)
+    end
 end)
 
 -- Give Car
@@ -112,7 +121,7 @@ RegisterNetEvent("ps-adminmenu:server:SetVehicleState", function(data, selectedD
 
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then
-        QBCore.Functions.Notify(src, locale("no_perms"), "error", 5000)
+        showNotification(src, locale("no_perms"), "error", 5000)
         return
     end
 
@@ -120,21 +129,28 @@ RegisterNetEvent("ps-adminmenu:server:SetVehicleState", function(data, selectedD
     local state = tonumber(selectedData['State'].value)
 
     if plate:len() > 8 then
-        QBCore.Functions.Notify(src, locale("plate_max"), "error", 5000)
+        showNotification(src, locale("plate_max"), "error", 5000)
         return
     end
 
     if not CheckAlreadyPlate(plate) then
-        QBCore.Functions.Notify(src, locale("plate_doesnt_exist"), "error", 5000)
+        showNotification(src, locale("plate_doesnt_exist"), "error", 5000)
         return
     end
 
-    MySQL.update('UPDATE player_vehicles SET state = ?, depotprice = ? WHERE plate = ?', { state, 0, plate })
+    if Config.Framework == 'QBCore' then
+        MySQL.update('UPDATE player_vehicles SET state = ?, depotprice = ? WHERE plate = ?', { state, 0, plate })
+    end
+    if Config.Framework == 'ESX' then
+        if state ~= 1 then
+            showNotification(src, 'For impound, state must be 1')
+            return
+        end
+        MySQL.update('UPDATE owned_vehicles SET impound = ? WHERE plate = ?', { state, plate })
+    end
 
-    QBCore.Functions.Notify(src, locale("state_changed"), "success", 5000)
+    showNotification(src, locale("state_changed"), "success", 5000)
 end)
-
--------------------------------------------------
 
 -- Change Plate
 RegisterNetEvent('ps-adminmenu:server:ChangePlate', function(newPlate, currentPlate)
@@ -202,14 +218,29 @@ RegisterNetEvent('ps-adminmenu:server:FixVehFor', function(data, selectedData)
     local data = CheckDataFromKey(data)
     if not data or not CheckPerms(source, data.perms) then return end
     local src = source
-    local playerId = selectedData['Player'].value
-    local Player = QBCore.Functions.GetPlayer(tonumber(playerId))
-    if Player then
-        local name = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
-        TriggerClientEvent('iens:repaira', Player.PlayerData.source)
-        TriggerClientEvent('vehiclemod:client:fixEverything', Player.PlayerData.source)
+    local playerId = tonumber(selectedData['Player'].value)
+    if Config.Framework == 'QBCore' then
+        local Player = QBCore.Functions.GetPlayer(tonumber(playerId))
+        if Player then
+            local name = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
+            TriggerClientEvent('iens:repaira', Player.PlayerData.source)
+            TriggerClientEvent('vehiclemod:client:fixEverything', Player.PlayerData.source)
+            showNotification(src, locale("veh_fixed", name), 'success', 7500)
+        else
+            showNotification(src, locale("not_online"), "error")
+        end
+    end
+    if Config.Framework == "ESX" then
+        local ped = GetPlayerPed(playerId)
+        local pedVehicle = GetVehiclePedIsIn(ped, false)
+        if not pedVehicle or GetPedInVehicleSeat(pedVehicle, -1) ~= ped then
+            showError(TranslateCap("not_in_vehicle"))
+            return
+        end
+        TriggerClientEvent("esx:repairPedVehicle", playerId)
         showNotification(src, locale("veh_fixed", name), 'success', 7500)
-    else
-        showNotification(src, locale("not_online"), "error")
+        if src ~= playerId then
+            showNotification(xTarget.source, locale("veh_fixed", name), 'success', 7500)
+        end
     end
 end)

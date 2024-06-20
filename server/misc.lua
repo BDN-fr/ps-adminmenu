@@ -280,12 +280,12 @@ RegisterNetEvent("ps-adminmenu:server:setPed", function(data, selectedData)
 
     local ped = selectedData["Ped Models"].label
     local tsrc = selectedData["Player"].value
-    local Player = QBCore.Functions.GetPlayer(tsrc)
+    local Player = getPlayerFromId(tsrc)
 
     if not Player then
         showNotification(locale("not_online"), "error", 5000)
         return
     end
 
-    TriggerClientEvent("ps-adminmenu:client:setPed", Player.PlayerData.source, ped)
+    TriggerClientEvent("ps-adminmenu:client:setPed", tsrc, ped)
 end)
