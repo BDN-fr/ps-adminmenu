@@ -94,3 +94,12 @@ function setVehicleProperties(vehicle, props)
         return ESX.Game.SetVehicleProperties(vehicle, props)
     end
 end
+
+function getVehicleProperties(vehicle)
+    if Config.Framework == "QBCore" then
+        return QBCore.Functions.GetVehicleProperties(vehicle)
+    end
+    if Config.Framework == "ESX" then
+        return ESX.Game.GetVehicleProperties(vehicle)
+    end
+end

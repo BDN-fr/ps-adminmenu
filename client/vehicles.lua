@@ -17,7 +17,9 @@ end
 
 -- Own Vehicle
 RegisterNetEvent('ps-adminmenu:client:Admincar', function(data)
-    if not CheckPerms(data.perms) then return end
+    local data = CheckDataFromKey(data)
+    if not data or not CheckPerms(data.perms) then return end
+
     if not cache.vehicle then return end
 
     local props = lib.getVehicleProperties(cache.vehicle)
@@ -40,7 +42,8 @@ end)
 
 -- Spawn Vehicle
 RegisterNetEvent('ps-adminmenu:client:SpawnVehicle', function(data, selectedData)
-    if not CheckPerms(data.perms) then return end
+    local data = CheckDataFromKey(data)
+    if not data or not CheckPerms(data.perms) then return end
 
     local selectedVehicle = selectedData["Vehicle"].value
     local hash = GetHashKey(selectedVehicle)
@@ -55,16 +58,30 @@ RegisterNetEvent('ps-adminmenu:client:SpawnVehicle', function(data, selectedData
 
     local vehicle = CreateVehicle(hash, GetEntityCoords(cache.ped), GetEntityHeading(cache.ped), true, false)
     TaskWarpPedIntoVehicle(cache.ped, vehicle, -1)
+
+    Wait(100)
+
+    if Config.Fuel == "ox_fuel" then
+        Entity(vehicle).state.fuel = 100.0
+    else
+        exports[Config.Fuel]:SetFuel(vehicle, 100.0)
+    end
+
     exports[Config.Fuel]:SetFuel(vehicle, 100.0)
     giveKeys(getPlates(vehicle))
 end)
 
 -- Refuel Vehicle
 RegisterNetEvent('ps-adminmenu:client:RefuelVehicle', function(data)
-    if not CheckPerms(data.perms) then return end
+    local data = CheckDataFromKey(data)
+    if not data or not CheckPerms(data.perms) then return end
 
     if cache.vehicle then
-        exports[Config.Fuel]:SetFuel(cache.vehicle, 100.0)
+        if Config.Fuel == "ox_fuel" then
+            Entity(cache.vehicle).state.fuel = 100.0
+        else
+            exports[Config.Fuel]:SetFuel(cache.vehicle, 100.0)
+        end
         showNotification(locale("refueled_vehicle"), 'success')
     else
         showNotification(locale("not_in_vehicle"), 'error')
@@ -73,7 +90,8 @@ end)
 
 -- Change plate
 RegisterNetEvent('ps-adminmenu:client:ChangePlate', function(data, selectedData)
-    if not CheckPerms(data.perms) then return end
+    local data = CheckDataFromKey(data)
+    if not data or not CheckPerms(data.perms) then return end
     local plate = selectedData["Plate"].value
 
     if string.len(plate) > 8 then
@@ -82,13 +100,13 @@ RegisterNetEvent('ps-adminmenu:client:ChangePlate', function(data, selectedData)
 
     if cache.vehicle then
         local AlreadyPlate = lib.callback.await("ps-adminmenu:callback:CheckAlreadyPlate", false, plate)
-    
+
         if AlreadyPlate then
             showNotification(locale("already_plate"), "error", 5000)
             return
         end
-            
-        local currentPlate = GetVehicleNumberPlateText( cache.vehicle)
+
+        local currentPlate = GetVehicleNumberPlateText(cache.vehicle)
         TriggerServerEvent('ps-adminmenu:server:ChangePlate', plate, currentPlate)
         Wait(100)
         SetVehicleNumberPlateText(cache.vehicle, plate)
@@ -127,7 +145,8 @@ local function UpdateVehicleMenu()
 end
 
 RegisterNetEvent('ps-adminmenu:client:ToggleVehDevMenu', function(data)
-    if not CheckPerms(data.perms) then return end
+    local data = CheckDataFromKey(data)
+    if not data or not CheckPerms(data.perms) then return end
     if not cache.vehicle then return end
 
     VEHICLE_DEV_MODE = not VEHICLE_DEV_MODE
@@ -154,7 +173,8 @@ end
 
 
 RegisterNetEvent('ps-adminmenu:client:maxmodVehicle', function(data)
-    if not CheckPerms(data.perms) then return end
+    local data = CheckDataFromKey(data)
+    if not data or not CheckPerms(data.perms) then return end
 
     if cache.vehicle then
         UpgradePerformance(cache.vehicle)
@@ -165,8 +185,10 @@ end)
 
 -- Spawn Personal vehicles
 
-RegisterNetEvent("ps-adminmenu:client:SpawnPersonalvehicle", function(data, selectedData)
-    if not CheckPerms(data.perms) then return end
+RegisterNetEvent("ps-adminmenu:client:SpawnPersonalVehicle", function(data, selectedData)
+    local data = CheckDataFromKey(data)
+    if not data or not CheckPerms(data.perms) then return end
+
     local plate = selectedData['VehiclePlate'].value
     local ped = PlayerPedId()
     local coords = getCoords(ped)
@@ -182,7 +204,30 @@ RegisterNetEvent("ps-adminmenu:client:SpawnPersonalvehicle", function(data, sele
         Wait(100)
         setVehicleProperties(veh, props)
         SetVehicleNumberPlateText(veh, plate)
-        exports[Config.Fuel]:SetFuel(veh, 100.0)
+        if Config.Fuel == "ox_fuel" then
+            Entity(veh).state.fuel = 100.0
+        else
+            exports[Config.Fuel]:SetFuel(veh, 100.0)
+        end
         giveKeys(plate)
     end, vehData.vehicle, coords, true)
+end)
+
+-- Get Vehicle Data
+lib.callback.register("ps-adminmenu:client:getvehData", function(vehicle)
+    lib.requestModel(vehicle)
+
+    local coords = vec(GetOffsetFromEntityInWorldCoords(cache.ped, 0.0, 2.0, 0.5), GetEntityHeading(cache.ped) + 90)
+    local veh = CreateVehicle(vehicle, coords, false, false)
+
+    local prop = {}
+    if DoesEntityExist(veh) then
+        SetEntityCollision(veh, false, false)
+        FreezeEntityPosition(veh, true)
+        prop = getVehicleProperties(veh)
+        Wait(500)
+        DeleteVehicle(veh)
+    end
+
+    return prop
 end)

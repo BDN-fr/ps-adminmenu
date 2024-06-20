@@ -2,7 +2,9 @@ local resources = {}
 
 lib.callback.register('ps-adminmenu:callback:GetResources', function(source)
     local totalResources = GetNumResources()
-
+        
+    resources = {}
+        
     for i = 0, totalResources - 1 do
         local resourceName = GetResourceByFindIndex(i)
         local author = GetResourceMetadata(resourceName, "author")
@@ -24,7 +26,8 @@ end)
 
 
 lib.callback.register('ps-adminmenu:callback:ChangeResourceState', function(source, data, perms)
-    if not CheckPerms(Config.ResourcePerms) then return end
+    print(json.encode(data))
+    if not CheckPerms(source, Config.ResourcePerms) then return end
 
     if data.state == "start" then
         StartResource(data.name)

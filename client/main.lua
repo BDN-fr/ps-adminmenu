@@ -5,6 +5,7 @@ local function setupMenu(xPlayer)
 	Wait(500)
 	PlayerData = getPlayerData(xPlayer)
 	local resources = lib.callback.await('ps-adminmenu:callback:GetResources', false)
+	local commands = lib.callback.await('ps-adminmenu:callback:GetCommands', false)
 	GetData()
 	SendNUIMessage({
 		action = "setupUI",
@@ -12,6 +13,7 @@ local function setupMenu(xPlayer)
 			actions = Config.Actions,
 			resources = resources,
 			playerData = PlayerData,
+			commands = commands
 		}
 	})
 end
@@ -40,19 +42,23 @@ end)
 --- @param data table
 RegisterNUICallback("clickButton", function(data)
 	local selectedData = data.selectedData
-	local data = data.data
---	print(json.encode(selectedData))
-	if not CheckPerms(data.perms) then return end
+	local key = data.data
+	local data = CheckDataFromKey(key)
+	if not data or not CheckPerms(data.perms) then return end
 
 	if data.type == "client" then
-		TriggerEvent(data.event, data, selectedData)
+		TriggerEvent(data.event, key, selectedData)
 	elseif data.type == "server" then
-		TriggerServerEvent(data.event, data, selectedData)
+		TriggerServerEvent(data.event, key, selectedData)
 	elseif data.type == "command" then
 		ExecuteCommand(data.event)
 	end
 
---	Log("Action Used", PlayerData.name .. " (" .. PlayerData.citizenid .. ") - Used: " .. data.label .. (selectedData and (" with args: " .. json.encode(selectedData)) or ""))
+	Log("Action Used: " .. key,
+            PlayerData.name ..
+            " (" ..
+            PlayerData.citizenid ..
+            ") - Used: " .. key .. (selectedData and (" with args: " .. json.encode(selectedData)) or ""))
 end)
 
 -- Open UI Event

@@ -3,10 +3,20 @@
 
 Config = Config or {}
 Config.Framework = "ESX" -- "ESX", "QBCore"
-Config.Fuel = "ps-fuel" -- "ps-fuel", "LegacyFuel"
+Config.Fuel = "ps-fuel"        -- "ps-fuel", "LegacyFuel", "ox_fuel"
 Config.ResourcePerms = 'admin' -- permission to control resource(start stop restart)
-Config.ModLevel = "admin" -- Used for menu command and admin chat
+Config.ShowCommandsPerms = 'admin' -- permission to show all commands
+Config.RenewedPhone = false    -- if you use qb-phone from renewed. (multijob)
+
 Config.Weather = "av_weather" -- "av_weather", "qb-weather"
+
+-- Key Bindings
+Config.Keybindings = true
+Config.AdminKey = "PageDown"
+Config.NoclipKey = "PageUp"
+
+-- Give Car
+Config.DefaultGarage = "Alta Garage"
 
 Config.Actions = {
     ["admin_car"] = {
@@ -118,12 +128,31 @@ Config.Actions = {
         },
     },
 
+    ["clear_inventory_offline"] = {
+        label = "Clear Inventory Offline",
+        perms = "admin",
+        dropdown = {
+            { label = "Citizen ID", option = "text",   data = "players" },
+            { label = "Confirm",    option = "button", type = "server", event = "ps-adminmenu:server:ClearInventoryOffline" },
+        },
+    },
+
     ["clothing_menu"] = {
         label = "Give Clothing Menu",
         perms = "admin",
         dropdown = {
-            { label = "Player", option = "dropdown", data = "players" },
-            { label = "Confirm", option = "button", type = "server", event = "ps-adminmenu:server:ClothingMenu" },
+            { label = "Player",  option = "dropdown", data = "players" },
+            { label = "Confirm", option = "button",   type = "server", event = "ps-adminmenu:server:ClothingMenu" },
+        },
+    },
+
+    ["set_ped"] = {
+        label = "Set Ped",
+        perms = "admin",
+        dropdown = {
+            { label = "Player",     option = "dropdown", data = "players" },
+            { label = "Ped Models", option = "dropdown", data = "pedlist" },
+            { label = "Confirm",    option = "button",   type = "server", event = "ps-adminmenu:server:setPed" },
         },
     },
 
@@ -131,10 +160,17 @@ Config.Actions = {
         label = "Copy Coords",
         perms = "admin",
         dropdown = {
-            { label = "Copy Vector2", option = "button", type = "command", event = "vector2" },
-            { label = "Copy Vector3", option = "button", type = "command", event = "vector3" },
-            { label = "Copy Vector4", option = "button", type = "command", event = "vector4" },
-            { label = "Copy Heading", option = "button", type = "command", event = "heading" },
+            {
+                label = "Copy Coords",
+                option = "dropdown",
+                data = {
+                    { label = "Copy Vector2", value = "vector2" },
+                    { label = "Copy Vector3", value = "vector3" },
+                    { label = "Copy Vector4",    value = "vector4" },
+                    { label = "Copy Heading",  value = "heading" },
+                },
+            },
+            { label = "Copy to Clipboard", option = "button", type = "client", event = "ps-adminmenu:client:copyToClipboard"},
         },
     },
 
@@ -154,6 +190,33 @@ Config.Actions = {
         },
     },
 
+    ["drunk_player"] = {
+        label = "Make Player Drunk",
+        perms = "admin",
+        dropdown = {
+            { label = "Player",  option = "dropdown", data = "players" },
+            { label = "Confirm", option = "button",   type = "server", event = "ps-adminmenu:server:DrunkPlayer" },
+        },
+    },
+
+    ["remove_stress"] = {
+        label = "Remove Stress",
+        perms = "admin",
+        dropdown = {
+            { label = "Player (Optional)", option = "dropdown", data = "players" },
+            { label = "Confirm",           option = "button",   type = "server", event = "ps-adminmenu:server:RemoveStress" },
+        },
+    },
+
+    ["set_ammo"] = {
+        label = "Set Ammo",
+        perms = "admin",
+        dropdown = {
+            { label = "Ammo Ammount", option = "text" },
+            { label = "Confirm",      option = "button", type = "client", event = "ps-adminmenu:client:SetAmmo" },
+        },
+    },
+
     -- ["nui_focus"] = {
     --     label = "Give NUI Focus",
     --     perms = "admin",
@@ -168,6 +231,18 @@ Config.Actions = {
         type = "client",
         event = "ps-adminmenu:client:ToggleGodmode",
         perms = "admin",
+    },
+
+    ["give_car"] = {
+        label = "Give Car",
+        perms = "admin",
+        dropdown = {
+            { label = "Vehicle",           option = "dropdown", data = "vehicles" },
+            { label = "Player",            option = "dropdown", data = "players" },
+            { label = "Plate (Optional)",  option = "text" },
+            { label = "Garage (Optional)", option = "text" },
+            { label = "Confirm",           option = "button",   type = "server",  event = "ps-adminmenu:server:givecar" },
+        }
     },
 
     ["invisible"] = {
@@ -192,7 +267,7 @@ Config.Actions = {
     },
 
     ["toggle_delete_lazer"] = {
-        label = "Toggle Delete Laser",
+        label = "Toggle Laser",
         type = "client",
         event = "ps-adminmenu:client:ToggleDeleteLaser",
         perms = "admin",
@@ -207,9 +282,10 @@ Config.Actions = {
                 label = "Permissions",
                 option = "dropdown",
                 data = {
-                    { label = "Mod",   value = "admin" },
+                    --{ label = "Mod",   value = "admin" },
+                    { label = "User", value = "user" },
                     { label = "Admin", value = "admin" },
-                    { label = "God",   value = "god" },
+                    --{ label = "God",   value = "god" },
                 },
             },
             { label = "Confirm", option = "button", type = "server", event = "ps-adminmenu:server:SetPerms" },
@@ -221,8 +297,17 @@ Config.Actions = {
         perms = "admin",
         dropdown = {
             { label = "Player",  option = "dropdown", data = "players" },
-            { label = "Bucket", option = "text" },
-            { label = "Confirm", option = "button", type = "server", event = "ps-adminmenu:server:SetBucket" },
+            { label = "Bucket",  option = "text" },
+            { label = "Confirm", option = "button",   type = "server", event = "ps-adminmenu:server:SetBucket" },
+        },
+    },
+
+    ["get_bucket"] = {
+        label = "Get Routing Bucket",
+        perms = "admin",
+        dropdown = {
+            { label = "Player",  option = "dropdown", data = "players" },
+            { label = "Confirm", option = "button",   type = "server", event = "ps-adminmenu:server:GetBucket" },
         },
     },
 
@@ -255,8 +340,34 @@ Config.Actions = {
         label = "Open Stash",
         perms = "admin",
         dropdown = {
-            { label = "Stash",  option = "text" },
-            { label = "Confirm", option = "button",   type = "client", event = "ps-adminmenu:client:openStash" },
+            { label = "Stash",   option = "text" },
+            { label = "Confirm", option = "button", type = "client", event = "ps-adminmenu:client:openStash" },
+        },
+    },
+
+    ["open_trunk"] = {
+        label = "Open Trunk",
+        perms = "admin",
+        dropdown = {
+            { label = "Plate",   option = "text" },
+            { label = "Confirm", option = "button", type = "client", event = "ps-adminmenu:client:openTrunk" },
+        },
+    },
+
+    ["change_vehicle_state"] = {
+        label = "Set Vehicle Garage State",
+        perms = "admin",
+        dropdown = {
+            { label = "Plate",   option = "text" },
+            {
+                label = "State",
+                option = "dropdown",
+                data = {
+                    { label = "In",  value = "1" },
+                    { label = "Out", value = "0" },
+                },
+            },
+            { label = "Confirm", option = "button", type = "server", event = "ps-adminmenu:server:SetVehicleState" },
         },
     },
 
@@ -324,6 +435,7 @@ Config.Actions = {
                 data = {
                     { label = "Cash", value = "money" },
                     { label = "Bank", value = "bank" },
+                    { label = "Black Money", value = "black_money" },
                     { label = "Crypto", value = "crypto" },
                 },
             },
@@ -342,6 +454,7 @@ Config.Actions = {
                 data = {
                     { label = "Cash", value = "money" },
                     { label = "Bank", value = "bank" },
+                    { label = "Black Money", value = "black_money" },
                     { label = "Crypto", value = "crypto" },
                 },
             },
@@ -361,6 +474,7 @@ Config.Actions = {
                 data = {
                     { label = "Cash", value = "money" },
                     { label = "Bank", value = "bank" },
+                    { label = "Black Money", value = "black_money" },
                 },
             },
             { label = "Confirm", option = "button", type = "server", event = "ps-adminmenu:server:TakeMoney" },
@@ -552,6 +666,54 @@ Config.Actions = {
             { label = "Play Sound", option = "button", type = "client", event = "ps-adminmenu:client:PlaySound" },
         },
     },
+}
+
+Config.PlayerActions = {
+    ["teleportToPlayer"] = {
+        label = "Teleport to Player",
+        type = "server",
+        event = "ps-adminmenu:server:TeleportToPlayer",
+        perms = "admin",
+    },
+    ["bringPlayer"] = {
+        label = "Bring Player",
+        type = "server",
+        event = "ps-adminmenu:server:BringPlayer",
+        perms = "admin",
+    },
+    ["revivePlayer"] = {
+        label = "Revive Player",
+        event = "ps-adminmenu:server:Revive",
+        perms = "admin",
+        type = "server"
+    },
+    ["spawnPersonalVehicle"] = {
+        label = "Spawn Personal Vehicle",
+        event = "ps-adminmenu:client:SpawnPersonalVehicle",
+        perms = "admin",
+        type = "client"
+    },
+    ["banPlayer"] = {
+        label = "Ban Player",
+        event = "ps-adminmenu:server:BanPlayer",
+        perms = "admin",
+        type = "server"
+    },
+    ["kickPlayer"] = {
+        label = "Kick Player",
+        event = "ps-adminmenu:server:KickPlayer",
+        perms = "admin",
+        type = "server"
+    }
+}
+
+Config.OtherActions = {
+    ["toggleDevmode"] = {
+        type = "client",
+        event = "ps-adminmenu:client:ToggleDev",
+        perms = "admin",
+        label = "Toggle Devmode"
+    }
 }
 
 AddEventHandler("onResourceStart", function()
