@@ -73,8 +73,9 @@ local function getPlayers()
         for k, v in pairs(GetPlayers) do
             local xPlayer = v
             local vehicles = getVehicles(xPlayer.identifier)
+            local phone = exports["lb-phone"]:GetEquippedPhoneNumber(xPlayer.source)
             players[#players + 1] = {
-                id = k,
+                id = xPlayer.source,
                 name = xPlayer.getName(),
                 cid = xPlayer.identifier,
                 license = getMyIdentifier(xPlayer.source, 'license'),
@@ -85,7 +86,7 @@ local function getPlayers()
                 dob = "Unknown",
                 cash = getMoney(xPlayer.source, "money"),
                 bank = getMoney(xPlayer.source, "bank"),
-                phone = "Unknown",
+                phone = phone or "Unknown",
                 vehicles = vehicles
             }
         end
